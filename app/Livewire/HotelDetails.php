@@ -15,12 +15,10 @@ class HotelDetails extends Component
     public $checkInDate;
     public $checkOutDate;
 
-    // Alur pemesanan
-    public $step = 1; // 1 = Pilihan kamar, 2 = Konfirmasi & Pembayaran
+    public $step = 1;
     public ?Room $selectedRoom = null;
     public $totalNights = 0;
     public $totalPrice = 0;
-    public $selectedPaymentMethod = 'bank_transfer'; // default
 
     protected $rules = [
         'checkInDate' => 'required|date|after_or_equal:today',
@@ -33,9 +31,9 @@ class HotelDetails extends Component
     }
 
     /**
-     * Langkah 1: Pilih kamar dan isi tanggal
+     * Tahap 1: Pilih kamar dan isi tanggal
      */
-    public function bookRoom(Room $room)
+    public function bookRoom($roomId)
     {
         if (!Auth::check()) {
             return redirect()->route('login');
@@ -43,40 +41,38 @@ class HotelDetails extends Component
 
         $this->validate();
 
-        $this->selectedRoom = $room;
+        $this->selectedRoom = Room::findOrFail($roomId);
 
-        // Hitung jumlah malam & total harga
+        // Hitung jumlah malam dan total harga
         $checkIn = Carbon::parse($this->checkInDate);
         $checkOut = Carbon::parse($this->checkOutDate);
-        $this->totalNights = max($checkOut->diffInDays($checkIn), 1); // minimal 1 malam
+        $this->totalNights = max($checkOut->diffInDays($checkIn), 1);
+
         $this->totalPrice = $this->selectedRoom->price_per_night * $this->totalNights;
 
-        // Pindah ke tahap 2 (konfirmasi)
         $this->step = 2;
     }
 
     /**
-     * Langkah 2: Konfirmasi dan simpan pemesanan
+     * Tahap 2: Konfirmasi dan simpan pemesanan
      */
     public function confirmBooking()
     {
-        if (!$this->selectedRoom || $this->totalNights <= 0 || !Auth::check()) {
-            session()->flash('error', 'Terjadi kesalahan. Silakan coba lagi.');
+        if (!$this->selectedRoom || $this->totalPrice <= 0) {
+            session()->flash('error', 'Data tidak valid. Silakan periksa kembali.');
             return;
         }
 
-        // Simpan ke database
         Booking::create([
             'user_id' => Auth::id(),
             'room_id' => $this->selectedRoom->id,
             'check_in_date' => $this->checkInDate,
             'check_out_date' => $this->checkOutDate,
             'total_price' => $this->totalPrice,
-            'payment_method' => $this->selectedPaymentMethod,
-            'status' => 'success', // langsung success
+            'status' => 'success',
         ]);
 
-        // Langsung redirect tanpa jeda
+        // Redirect langsung ke halaman my-bookings
         return $this->redirect('/my-bookings', navigate: true);
     }
 
